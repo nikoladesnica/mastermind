@@ -1,0 +1,143 @@
+@startuml
+hide footbox
+autonumber
+title Mastermind - Multiplayer Flow
+
+skinparam ArrowThickness 1.2
+skinparam ParticipantPadding 20
+skinparam BoxPadding 6
+skinparam sequenceMessageAlign center
+
+actor Host
+actor Player
+participant RoomController
+participant RoomService
+participant SecretCodeGenerator
+participant GuessEvaluator
+database RoomRepository
+participant BeanConfig
+
+== Application startup (DI wiring) ==
+BeanConfig -[#Orange,dotted]-> RoomRepository : creates
+BeanConfig -[#Orange,dotted]-> SecretCodeGenerator : creates
+BeanConfig -[#Orange,dotted]-> GuessEvaluator : creates
+BeanConfig -[#Orange,dotted]-> RoomService : creates
+
+== Create room (no player yet) ==
+Host -[#RoyalBlue]-> RoomController : POST /api/rooms
+RoomController -[#RoyalBlue]-> RoomService : createRoom()
+RoomService -[#RoyalBlue]-> RoomRepository : save(room)\nstate: WAITING\nhostToken
+RoomService -[#DarkGreen,dashed]-> RoomController : Room
+RoomController -[#DarkGreen,dashed]-> Host : 200 CreateRoomResponse\n{roomId, hostToken}
+
+== Players join (optional, before start) ==
+note over RoomController
+  Host joins as a player immediately after room creation - this is necessary for the host to later participate in the game.
+  Other players joining is fully optional, however, room.players() cannot be empty before start.
+end note
+loop each join request
+  Player -[#RoyalBlue]-> RoomController : POST /api/rooms/{roomId}/join\nJoinRoomRequest{name}
+  RoomController -[#RoyalBlue]-> RoomService : join(roomId, name)
+  RoomService -[#RoyalBlue]-> RoomRepository : findById(roomId)
+  RoomRepository -[#DarkGreen,dashed]-> RoomService : Room
+  RoomService -[#RoyalBlue]-> RoomRepository : save(room)\nwith new player
+  RoomService -[#DarkGreen,dashed]-> RoomController : Player
+  RoomController -[#DarkGreen,dashed]-> Player : 200 JoinRoomResponse\n{roomId, playerId, playerToken}
+end
+
+newpage
+
+== Client polls for RoomView every 1.5s ==
+loop poll every 1.5s while state in { WAITING, RUNNING }
+Player -[#RoyalBlue]-> RoomController : GET /api/rooms/{roomId}
+RoomController -[#RoyalBlue]-> RoomService : get(roomId)
+RoomService -[#RoyalBlue]-> RoomRepository : findById(roomId)
+RoomRepository -[#DarkGreen,dashed]-> RoomService : Room
+RoomService -[#DarkGreen,dashed]-> RoomController : Room
+RoomController -[#DarkGreen,dashed]-> Player : 200 RoomView\nuntil room.state == FINISHED
+end
+
+== Edge case (kick player) ==
+note over Host
+  Host can kick any player from the lobby, only if room.state == WAITING
+end note
+Host -[#RoyalBlue]-> RoomController : POST /api/rooms/{roomId}/kick/{playerId}\nX-Host-Token: hostToken
+RoomController -[#RoyalBlue]-> RoomService : kick(roomId, hostToken, playerId)
+RoomService -[#RoyalBlue]-> RoomRepository : findById(roomId)
+RoomRepository -[#DarkGreen,dashed]-> RoomService : Room
+note over RoomService
+  Removes player from room.players()
+end note
+RoomService -[#RoyalBlue]-> RoomRepository : save(room)
+RoomService -[#DarkGreen,dashed]-> RoomController : Room
+RoomController -[#DarkGreen,dashed]-> Player : 200 RoomView
+
+newpage
+
+== Start game (host privilege) ==
+Host -[#RoyalBlue]-> RoomController : POST /api/rooms/{roomId}/start\nX-Host-Token: hostToken
+RoomController -[#RoyalBlue]-> RoomService : start(roomId, hostToken)
+RoomService -[#RoyalBlue]-> RoomRepository : findById(roomId)
+RoomRepository -[#DarkGreen,dashed]-> RoomService : Room
+RoomService -[#RoyalBlue]-> SecretCodeGenerator : generate()
+note over RoomService
+  If room.state != WAITING, no-op
+  room.players() cannot be empty
+end note
+RoomService -[#RoyalBlue]-> RoomRepository : **save(room)**\nstartedAt: now\nset state: RUNNING\nstatus: IN_PROGRESS\n^\nfor each room.players()
+RoomService -[#DarkGreen,dashed]-> RoomController : Room
+RoomController -[#DarkGreen,dashed]-> Player : 200 RoomView (RUNNING)
+note over Host
+  Host is now just a player in the game.
+  Client clears host token from local storage.
+end note
+destroy Host
+
+== Edge case (leave room) ==
+Player -[#RoyalBlue]-> RoomController : POST /api/rooms/{roomId}/leave\nX-Player-Id: playerId\nX-Player-Token: playerToken
+RoomController -[#RoyalBlue]-> RoomService : leave(roomId, playerId, playerToken)
+RoomService -[#RoyalBlue]-> RoomRepository : findById(roomId)
+note over RoomService
+  Finds player, validates token
+  If room state is RUNNING:
+    If player.status == IN_PROGRESS, mark as LOST
+    If room.allFinished(), mark room state as FINISHED
+  If room state is WAITING -> remove player from room.players()
+  If room state is FINISHED -> no-op
+end note
+RoomRepository -[#DarkGreen,dashed]-> RoomService : Room
+RoomService -[#RoyalBlue]-> RoomRepository : save(room)
+RoomService -[#DarkGreen,dashed]-> RoomController : Room
+RoomController -[#DarkGreen,dashed]-> Player : 200 RoomView
+
+newpage
+
+== Guess turns ==
+loop each turn
+  Player -[#RoyalBlue]-> RoomController : POST /api/rooms/{roomId}/guesses\nX-Player-Id: playerId\nX-Player-Token: playerToken\nGuessRequest{digits}
+  RoomController -[#RoyalBlue]-> RoomService : guess(roomId, playerId, playerToken, req.digits)
+  RoomService -[#RoyalBlue]-> RoomRepository : findById(roomId)
+  RoomRepository -[#DarkGreen,dashed]-> RoomService : Room
+  note over RoomService
+    Validates room state, player token, player game status
+  end note
+  RoomService -[#RoyalBlue]-> GuessEvaluator : evaluate(secret, guess)
+  GuessEvaluator -[#DarkGreen,dashed]-> RoomService : Feedback
+  note over RoomService
+      Updates player history, attempts left, status, finishedAt (if applicable)
+    end note
+  RoomService -[#RoyalBlue]-> RoomRepository : save(room)
+  RoomService -[#DarkGreen,dashed]-> RoomController : Room
+  RoomController -[#DarkGreen,dashed]-> Player : 200 RoomView (w/ feedback)\n or ↓
+end
+
+RoomController -[#DarkGreen,dashed]-> Player : 200 RoomView{status: LOST} - if attemptsLeft == 0 \n or ↓
+
+== Finished game ==
+alt WON
+  RoomController -[#DarkGreen,dashed]-> Player : 200 RoomView{status: WON}\n room state: FINISHED \n or ↓
+else LOST
+  RoomController -[#DarkGreen,dashed]-> Player : 200 RoomView{status: LOST}\n room state: FINISHED\n - if room.allFinished()
+end
+
+@enduml

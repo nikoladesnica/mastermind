@@ -1,11 +1,10 @@
 package com.nikoladesnica.mastermind.api.error;
 
-import java.time.Instant;
-
+/** Stable error payload for all error responses. */
 public record ApiError(
-        Instant timestamp,
-        int status,
-        String error,
+        String timestamp,  // Instant.now.toString() later...
+        int status,        // 400, 403, 404, 500, ...
+        String error,      // "Bad Request", "Forbidden", ...
         String message,
-        String path
+        String path        // request path
 ) {}

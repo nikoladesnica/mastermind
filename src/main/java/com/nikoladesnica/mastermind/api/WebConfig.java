@@ -10,8 +10,6 @@ public class WebConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
                 .allowedOrigins(
-                        "http://localhost:5173",           // Vite dev (if you bypass proxy)
-                        "https://mastermind-game.lovable.app",    // replace with actual hosted UI origin
                         "https://mastermind.nikoladesnica.com"
                 )
                 .allowedMethods("GET","POST","OPTIONS")

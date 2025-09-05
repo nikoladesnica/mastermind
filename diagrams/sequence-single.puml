@@ -1,0 +1,53 @@
+@startuml
+hide footbox
+autonumber
+title Mastermind — Single Player Flow
+
+skinparam ArrowThickness 1.2
+skinparam ParticipantPadding 20
+skinparam BoxPadding 6
+skinparam sequenceMessageAlign center
+
+actor Client
+participant GameController
+participant GameService
+participant SecretCodeGenerator
+participant GuessEvaluator
+database GameRepository
+participant BeanConfig
+
+== Application startup (DI wiring) ==
+BeanConfig -[#Orange,dotted]-> GameRepository : creates
+BeanConfig -[#Orange,dotted]-> SecretCodeGenerator : creates
+BeanConfig -[#Orange,dotted]-> GuessEvaluator : creates
+BeanConfig -[#Orange,dotted]-> GameService : creates
+
+== Start new game ==
+Client -[#RoyalBlue]-> GameController : POST /api/games\nNewGameRequest{default empty}\n or {allowDuplicates, attempts}
+GameController -[#RoyalBlue]-> GameService : startGame()
+GameService -[#RoyalBlue]-> SecretCodeGenerator : generate()
+GameService -[#RoyalBlue]-> GameRepository : save(game)
+GameService -[#DarkGreen,dashed]-> GameController : Game
+GameController -[#DarkGreen,dashed]-> Client : 200 NewGameResponse\n{gameId, attemptsLeft, status}
+
+newpage
+
+== Guess loop (≤10 attempts) ==
+loop each guess
+  Client -[#RoyalBlue]-> GameController : POST /api/games/{id}/guesses\nGuessRequest{digits}
+  GameController -[#RoyalBlue]-> GameService : submitGuess(gameId, req.digits)
+  GameService -[#RoyalBlue]-> GameRepository : findById(id)
+  GameRepository -[#DarkGreen,dashed]-> GameService : Game
+  GameService -[#RoyalBlue]-> GuessEvaluator : evaluate(secret, guess)
+  GuessEvaluator -[#DarkGreen,dashed]-> GameService : Feedback
+  GameService -[#RoyalBlue]-> GameRepository : save(game)
+  GameService -[#DarkGreen,dashed]-> GameController : Game
+  GameController -[#DarkGreen,dashed]-> Client : 200 GameView (w/ feedback)\n or ↓
+end
+== Finished game ==
+alt WON
+  GameController -[#DarkGreen,dashed]-> Client : 200 GameView{status: WON}
+else LOST
+  GameController -[#DarkGreen,dashed]-> Client : 200 GameView{status: LOST} - if attemptsLeft == 0
+end
+@enduml
