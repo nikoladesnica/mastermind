@@ -11,3 +11,6 @@ mastermind:
   random-org:
     timeout-ms: 1200
     base-url: https://www.random.org/integers/
+
+leaderboard:
+  topK: 10

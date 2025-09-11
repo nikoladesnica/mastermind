@@ -15,14 +15,19 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
+// Accounts & Leaderboard Extension
+import com.nikoladesnica.mastermind.domain.service.AccountService;
+
 @RestController
 @RequestMapping("/api")
 public class RoomController {
 
     private final RoomService service;
+    private final AccountService accountService;
 
-    public RoomController(RoomService service) {
+    public RoomController(RoomService service, AccountService accountService) {
         this.service = service;
+        this.accountService = accountService;
     }
 
     @PostMapping("/rooms")
@@ -49,8 +54,18 @@ public class RoomController {
     public ResponseEntity<RoomView> guess(@PathVariable UUID roomId,
                                           @RequestHeader("X-Player-Id") UUID playerId,
                                           @RequestHeader("X-Player-Token") String playerToken,
+                                          @RequestHeader(value = "X-Session-Token", required = false) UUID sessionToken,
                                           @Valid @RequestBody GuessRequest req) {
         Room room = service.guess(roomId, playerId, playerToken, req.digits());
+        
+        if (sessionToken != null) {
+            var player = room.players().get(playerId);
+            if (player != null && player.status() == GameStatus.WON) {
+                UUID accountId = accountService.accountIdFromSession(sessionToken);
+                accountService.recordWin(accountId);
+            }
+        }
+        
         return ResponseEntity.ok(Mappers.view(room));
     }
 

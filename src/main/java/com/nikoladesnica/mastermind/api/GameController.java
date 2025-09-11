@@ -13,14 +13,19 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+// Accounts & Leaderboard Extension
+import com.nikoladesnica.mastermind.domain.service.AccountService;
+
 @RestController
 @RequestMapping("/api")
 public class GameController {
 
     private final GameService service;
+    private final AccountService accountService;
 
-    public GameController(GameService service) {
+    public GameController(GameService service, AccountService accountService) {
         this.service = service;
+        this.accountService = accountService;
     }
 
     @PostMapping("/games")
@@ -31,8 +36,16 @@ public class GameController {
     }
 
     @PostMapping("/games/{id}/guesses")
-    public ResponseEntity<GameView> guess(@PathVariable UUID id, @Valid @RequestBody GuessRequest req) {
+    public ResponseEntity<GameView> guess(@PathVariable UUID id,
+                                          @RequestHeader(value = "X-Session-Token", required = false) UUID sessionToken,
+                                          @Valid @RequestBody GuessRequest req) {
         Game game = service.submitGuess(id, req.digits());
+
+        if (sessionToken != null && game.status() == GameStatus.WON) {
+            UUID accountId = accountService.accountIdFromSession(sessionToken);
+            accountService.recordWin(accountId);
+        }
+        
         return ResponseEntity.ok(Mappers.view(game));
     }
 

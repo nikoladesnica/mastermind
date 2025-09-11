@@ -3,6 +3,16 @@ package com.nikoladesnica.mastermind.infra.config;
 import com.nikoladesnica.mastermind.domain.ports.GameRepository;
 import com.nikoladesnica.mastermind.domain.ports.RoomRepository;
 import com.nikoladesnica.mastermind.domain.ports.SecretCodeGenerator;
+
+// Accounts & Leaderboard Extension
+import com.nikoladesnica.mastermind.domain.ports.AccountRepository;
+import com.nikoladesnica.mastermind.domain.ports.SessionRepository;
+import com.nikoladesnica.mastermind.domain.ports.LeaderboardRepository;
+import com.nikoladesnica.mastermind.domain.service.AccountService;
+import com.nikoladesnica.mastermind.infra.repo.InMemoryAccountRepository;
+import com.nikoladesnica.mastermind.infra.repo.InMemorySessionRepository;
+import com.nikoladesnica.mastermind.infra.repo.InMemoryLeaderboard;
+
 import com.nikoladesnica.mastermind.domain.service.GameService;
 import com.nikoladesnica.mastermind.domain.service.GuessEvaluator;
 import com.nikoladesnica.mastermind.domain.service.RoomService;
@@ -15,7 +25,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties(GameProperties.class)
+@EnableConfigurationProperties({GameProperties.class, LeaderboardProperties.class})
 public class BeanConfig {
 
     @Bean
@@ -42,6 +52,22 @@ public class BeanConfig {
     }
 
     @Bean
+    public AccountRepository accountRepository() {
+        return new InMemoryAccountRepository();
+    }
+
+    @Bean
+    public SessionRepository sessionRepository() {
+        return new InMemorySessionRepository();
+    }
+
+    @Bean
+    public LeaderboardRepository leaderboardRepository(LeaderboardProperties props) {
+        int k = props.topK() > 0 ? props.topK() : 10;
+        return new InMemoryLeaderboard(k);
+    }
+
+    @Bean
     public GameService gameService(GameRepository repo,
                                    SecretCodeGenerator gen,
                                    GuessEvaluator eval,
@@ -55,5 +81,12 @@ public class BeanConfig {
                                    GuessEvaluator eval,
                                    GameProperties props) {
         return new RoomService(rooms, gen, eval, props);
+    }
+
+    @Bean
+    public AccountService accountService(AccountRepository accounts,
+                                         SessionRepository sessions,
+                                         LeaderboardRepository leaderboard) {
+        return new AccountService(accounts, sessions, leaderboard);
     }
 }

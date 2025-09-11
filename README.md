@@ -1,3 +1,37 @@
+# Temporary Note
+
+> There are extension updates (Account and Leaderboard) in the codebase for which the README has yet to be updated. Please refer to the code for the latest changes.
+I will clean up the README once the code is finalized and fully tested, and once I have updated all files with javadoc comments.
+I will also create a new sequence diagram with plantUML, separate from existing ones, to illustrate the new features.
+
+> Note that the fronted has not been updated yet, however, the extension features do not affect its previous functionality.
+I will update the frontend once I have fully cleaned up the backend codebase.
+
+The changes include the following files:
+```bash
+new file:   src/main/java/com/nikoladesnica/mastermind/api/AccountController.java
+modified:   src/main/java/com/nikoladesnica/mastermind/api/GameController.java
+new file:   src/main/java/com/nikoladesnica/mastermind/api/LeaderboardController.java
+modified:   src/main/java/com/nikoladesnica/mastermind/api/RoomController.java
+new file:   src/main/java/com/nikoladesnica/mastermind/api/dto/CreateAccountRequest.java
+new file:   src/main/java/com/nikoladesnica/mastermind/api/dto/CreateAccountResponse.java
+new file:   src/main/java/com/nikoladesnica/mastermind/api/dto/LeaderboardEntry.java
+new file:   src/main/java/com/nikoladesnica/mastermind/api/dto/LoginRequest.java
+new file:   src/main/java/com/nikoladesnica/mastermind/api/dto/LoginResponse.java
+new file:   src/main/java/com/nikoladesnica/mastermind/domain/model/Account.java
+new file:   src/main/java/com/nikoladesnica/mastermind/domain/model/Score.java
+new file:   src/main/java/com/nikoladesnica/mastermind/domain/model/Session.java
+new file:   src/main/java/com/nikoladesnica/mastermind/domain/ports/AccountRepository.java
+new file:   src/main/java/com/nikoladesnica/mastermind/domain/ports/LeaderboardRepository.java
+new file:   src/main/java/com/nikoladesnica/mastermind/domain/ports/SessionRepository.java
+new file:   src/main/java/com/nikoladesnica/mastermind/domain/service/AccountService.java
+modified:   src/main/java/com/nikoladesnica/mastermind/infra/config/BeanConfig.java
+new file:   src/main/java/com/nikoladesnica/mastermind/infra/config/LeaderboardProperties.java
+new file:   src/main/java/com/nikoladesnica/mastermind/infra/repo/InMemoryAccountRepository.java
+new file:   src/main/java/com/nikoladesnica/mastermind/infra/repo/InMemoryLeaderboard.java
+new file:   src/main/java/com/nikoladesnica/mastermind/infra/repo/InMemorySessionRepository.java
+modified:   src/main/resources/application.yml
+```
 # Mastermind — Backend (Spring Boot + Hexagonal)
 
 > A well-tested engine for the Mastermind game. This repo is **fully backend**, focusing on clarity, testability, and extensibility. The UI is implemented separately and hosted at **[https://mastermind.nikoladesnica.com](https://mastermind.nikoladesnica.com)**, where you can hook up a custom API base (if you choose to run this project locally). If so, use **ngrok** to expose your backend. By default, the frontend points to my hosted backend at **[https://mastermind-backend.nikoladesnica.com](https://mastermind-backend.nikoladesnica.com)**, which redirects to my DigitalOcean server (running Docker). To verify your own local instance, update the frontend API base as described in the fronted web app where you can verify that requests go to your ngrok URL instead of my hosted backend (to test my submission).
